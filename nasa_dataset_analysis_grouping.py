@@ -11,10 +11,10 @@ from pyspark import SparkConf, SparkContext
 
 logFile = "/Users/Felipe/PycharmProjects/spark_project/access_log_Jul95.log"
 sc = SparkContext("local", "Nasa Dataset Analysis")
-logData = sc.textFile(logFile).cache()
+logData = sc.textFile(logFile)
 
-def path_pairs(x):
-    list_pairs = []
+def get_keys_values(x):
+    key_value = []
 
     try:
         x = x.split("GET")[1].split("HTTP")[0].split("/")
@@ -27,31 +27,35 @@ def path_pairs(x):
             except IndexError:
                 print("Without request or protocol: ", x)
 
-        # There is no file in the path, it is a sequence of folders
-        if x[0] == " " and x[-1] == " ":
-            i = 0
-            while i < len(x) - len(x) - 1:
-                try:
-                    item = str(x[i + 1]), str(x[i + 2])
-                    list_pairs.append(item)
-                except UnicodeEncodeError:
-                    print ("Unicode Error: ", x)
-                i += 1
-
-        # There is a file in the path
-        if x[-1] != " ":
+    # There is no file in the path, it is a valid sequence of folders
+    if x[0] == " " and x[-1] == " " and len(x) > 2:
+        i = 0
+        while i < len(x) - (len(x) - 1):
             try:
-                item = str(x[len(x) - 2]), str(x[len(x) - 1])
-                list_pairs.append(item)
+                item = str(x[i + 1]), str(x[i + 2])
+                key_value.append(item)
             except UnicodeEncodeError:
                 print ("Unicode Error: ", x)
+            except IndexError:
+                print("Seq.", x)
+            i += 1
 
-    return list_pairs
+    # There is a file in the path
+    if x[-1] != " ":
+        try:
+            item = str(x[len(x) - 2]), str(x[len(x) - 1])
+            key_value.append(item)
+        except UnicodeEncodeError:
+            print ("Unicode Error: ", x)
 
-paths_rdd = logData.flatMap(lambda line: path_pairs(line))
-result = paths_rdd.groupByKey()
+    return key_value
 
-for line in result.take(1000):
+keys_values_rdd = logData.flatMap(lambda line: get_keys_values(line))
+result = keys_values_rdd.groupByKey()
+
+for line in result.take(1):
     print ("- %s" % line[0])
     for line in line[1]:
         print ("-- %s" % line)
+
+print result.toDebugString()
